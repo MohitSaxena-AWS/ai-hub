@@ -1,0 +1,77 @@
+# Spins up the backend together with MongoDB for local runs and the E2E test
+# (assignment sections 6 and 8).
+#
+# Defaults make the stack runnable with zero configuration: with no API key it
+# runs the deterministic mock assistant, and the local embedding backend (baked
+# into the image) gives real semantic duplicate detection without any text
+# leaving the container. Set SIMILARITY_BACKEND=lexical for a lean, ML-free build
+# (one knob drives both what is installed and what runs); set ANTHROPIC_API_KEY
+# to use the real Claude API.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # Not published to the host: only the app (on the compose network) needs it,
+    # so the database is not reachable from outside. Uncomment to inspect it
+    # locally with a Mongo client.
+    # ports:
+    #   - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # One knob: selects the backend AND bakes it as the image's runtime
+        # default. "embedding" (default) installs the ML stack; "lexical" builds
+        # a lean, ML-free image.
+        SIMILARITY_BACKEND: ${SIMILARITY_BACKEND:-embedding}
+        EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+    image: ai-hub:latest
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    # List form so SIMILARITY_BACKEND / EMBEDDING_MODEL are *passed through* only
+    # when set on the host. Otherwise the image's baked-in default (from the
+    # build arg above) stands, so a lean image always runs the lexical backend it
+    # was built with — no silent build/runtime drift.
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - MONGO_DB=ai_hub
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-haiku-4-5-20251001}
+      # With no API key the app automatically falls back to the mock assistant;
+      # provide ANTHROPIC_API_KEY to use the real Claude API. Set USE_MOCK_LLM=true
+      # to force the mock even when a key is present.
+      - USE_MOCK_LLM=${USE_MOCK_LLM:-false}
+      # Authentication is OFF in this local compose so the curl/Postman demo
+      # works with zero config. The app itself defaults to AUTH_ENABLED=true
+      # (secure by default); enable it here for a realistic run, supplying a
+      # strong AUTH_SECRET (from a secrets manager in production — see SECURITY.md):
+      #   AUTH_ENABLED=true AUTH_SECRET=$(openssl rand -hex 32) docker compose up
+      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      - AUTH_SECRET=${AUTH_SECRET:-}
+      # Pass-through (no default): overrides the image's baked-in backend only
+      # when explicitly set, keeping image and runtime consistent by default.
+      - SIMILARITY_BACKEND
+      - EMBEDDING_MODEL
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mongo_data:

@@ -1,0 +1,52 @@
+[project]
+name = "ai-hub"
+version = "0.1.0"
+description = "Configuration-driven AI chatbot backend for an internal engineering service desk"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "motor>=3.6",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "pyyaml>=6.0",
+    "anthropic>=0.40",
+    "httpx>=0.27",
+    "pyjwt>=2.9",
+]
+
+[project.optional-dependencies]
+# Local semantic-similarity backend. Kept optional so local dev/tests don't pull
+# in torch; the Docker image installs this for the production embedding backend.
+embeddings = [
+    "sentence-transformers>=3.0",
+    "numpy>=1.26",
+]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "mongomock-motor>=0.0.34",
+    "ruff>=0.7",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "slow: integration tests that load the real embedding model (skipped unless the 'embeddings' extra is installed)",
+    "live: tests that call the real Anthropic API (skipped unless RUN_LIVE_LLM=1 and ANTHROPIC_API_KEY are set)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Discover the app package and all its sub-packages (app.api, app.core, ...).
+# A bare packages = ["app"] would omit the sub-packages and produce a broken
+# non-editable install.
+[tool.setuptools.packages.find]
+include = ["app*"]

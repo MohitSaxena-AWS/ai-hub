@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Local tool / editor state — not part of the project.
+.claude/
+.idea/
+.vscode/
+
+# Binary docs are not part of the deliverable (assignment §10 prefers Markdown).
+# This keeps the original assignment PDF out of the repo.
+*.pdf
