@@ -41,8 +41,8 @@ jobs:
         run: ruff check app tests e2e eval
 
       - name: Test (offline; slow/live auto-skip)
-        env:
-          USE_MOCK_LLM: "true"
-          SIMILARITY_BACKEND: lexical
-          AUTH_SECRET: ci-secret-at-least-32-bytes-long!!
+        # No env needed: tests/conftest.py sets the offline test environment
+        # (USE_MOCK_LLM, SIMILARITY_BACKEND=lexical, and the AUTH_SECRET it mints
+        # tokens with) via os.environ.setdefault before the app is imported.
+        # Setting a *different* AUTH_SECRET here would break token verification.
         run: pytest -q
